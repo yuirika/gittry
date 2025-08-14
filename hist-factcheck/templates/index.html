@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<title>Исторический факт-чекинг</title>
+	<style>
+		* { box-sizing: border-box; }
+		body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial, "Noto Sans", sans-serif; margin: 0; background: #0f172a; color: #e2e8f0; }
+		.container { max-width: 760px; margin: 48px auto; padding: 0 16px; }
+		h1 { font-size: 24px; margin-bottom: 16px; }
+		.card { background: #111827; border: 1px solid #1f2937; border-radius: 12px; padding: 16px; }
+		.row { display: flex; gap: 8px; }
+		input[type="text"] { flex: 1; padding: 12px 14px; font-size: 16px; border-radius: 8px; border: 1px solid #374151; background: #0b1020; color: #e5e7eb; }
+		button { padding: 12px 16px; font-size: 16px; border-radius: 8px; border: 0; background: #2563eb; color: white; cursor: pointer; }
+		button:disabled { opacity: 0.6; cursor: not-allowed; }
+		.result { margin-top: 16px; background: #0b1020; border: 1px solid #1f2937; border-radius: 8px; padding: 12px; }
+		.badge { display: inline-block; padding: 4px 8px; border-radius: 999px; font-size: 12px; }
+		.badge-yes { background: #065f46; }
+		.badge-no { background: #7f1d1d; }
+		.badge-maybe { background: #92400e; }
+		.explain { margin-top: 8px; }
+		.link { color: #93c5fd; }
+	</style>
+</head>
+<body>
+	<div class="container">
+		<h1>Исторический факт-чекинг (до XXI века)</h1>
+		<div class="card">
+			<div class="row">
+				<input id="query" type="text" placeholder="Например: Пётр I создал 300 мануфактур" />
+				<button id="checkBtn">Проверить</button>
+			</div>
+			<div id="result" class="result" style="display:none"></div>
+		</div>
+	</div>
+
+	<script>
+	const $ = (sel) => document.querySelector(sel);
+	const queryInput = $('#query');
+	const checkBtn = $('#checkBtn');
+	const resultDiv = $('#result');
+
+	function renderResult(data) {
+		resultDiv.style.display = 'block';
+		if (!data.ok) {
+			resultDiv.innerHTML = `<div>Ошибка: ${data.error}</div>`;
+			return;
+		}
+
+		const verdictText = data.verdict === 'да' ? 'ДА' : (data.verdict === 'нет' ? 'НЕТ' : 'НЕОДНОЗНАЧНО');
+		const badgeClass = data.verdict === 'да' ? 'badge-yes' : (data.verdict === 'нет' ? 'badge-no' : 'badge-maybe');
+
+		let html = `<div class="badge ${badgeClass}">${verdictText}</div>`;
+		if (data.sourceTitle && data.sourceUrl) {
+			html += ` <a class="link" target="_blank" rel="noopener" href="${data.sourceUrl}">${data.sourceTitle}</a>`;
+		}
+
+		if (data.showExplain) {
+			html += `<div class="explain"><button id="explainBtn">Объяснить</button></div>`;
+		}
+
+		resultDiv.innerHTML = html;
+
+		const explainBtn = $('#explainBtn');
+		if (explainBtn) {
+			explainBtn.addEventListener('click', () => {
+				explainBtn.disabled = true;
+				explainBtn.textContent = '…';
+				setTimeout(() => {
+					explainBtn.parentElement.innerHTML = `<div>${data.explanation || 'Нет подробностей.'}</div>`;
+				}, 200);
+			});
+		}
+	}
+
+	async function doCheck() {
+		const query = queryInput.value.trim();
+		if (!query) return;
+		checkBtn.disabled = true;
+		checkBtn.textContent = 'Проверка…';
+		try {
+			const res = await fetch('/api/factcheck', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ query })
+			});
+			const data = await res.json();
+			renderResult(data);
+		} catch (e) {
+			renderResult({ ok: false, error: 'Ошибка сети.' });
+		} finally {
+			checkBtn.disabled = false;
+			checkBtn.textContent = 'Проверить';
+		}
+	}
+
+	checkBtn.addEventListener('click', doCheck);
+	queryInput.addEventListener('keydown', (e) => {
+		if (e.key === 'Enter') doCheck();
+	});
+	</script>
+</body>
+</html>
